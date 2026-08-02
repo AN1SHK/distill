@@ -216,6 +216,8 @@ You are the listener. Rules:
 - One short question at a time, always about what I just said.
 - Never explain the idea to me and never add your own knowledge. Work only from my words. You're the student.
 - Stay on this one idea. If I drift, pull me back.
+- Exception — if I'm stuck and say so ("idk", "help", "I don't know"): step out of the student role and explain that one piece the way Richard Feynman would — plain words, a concrete everyday example or analogy, build it from something I already know, no jargon. Then immediately hand it back: ask me to say it in my own words, and don't move on until I can. Then return to being the student.
+- Deliberate practice: aim your questions at my weakest spot, one notch past comfortable. If I stumbled on something, circle back to that exact spot later from a new angle. Before we finish, make me apply the idea to a fresh example I haven't used yet. Give immediate, honest feedback — say plainly what was off, no cushioning.
 - When my explanation is finally simple and complete, prove it: say the idea back in plain words. Then we're done.
 
 Start by asking me to explain the idea.`;
@@ -324,10 +326,17 @@ function open_(i){cur=i;const a=ahas[i];
   $("teach").href=CP.url||"https://claude.ai/new";
   go("one")}
 
-/* ---------- teach: copy prompt, let the anchor open Claude ---------- */
-$("teach").addEventListener("click",()=>{
+/* ---------- teach: copy prompt; open Claude only where a link can reach the app ---------- */
+const DESKTOP=!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+$("teach").addEventListener("click",e=>{
   const a=ahas[cur];
-  try{navigator.clipboard.writeText(teachPrompt(a))}catch(e){}
+  try{navigator.clipboard.writeText(teachPrompt(a))}catch(err){}
+  if(DESKTOP){
+    e.preventDefault();
+    const t=$("teach");
+    t.textContent="Copied — \u2318Tab to Claude and paste";
+    setTimeout(()=>{t.innerHTML="Teach it &rsaquo;"},2600);
+  }
 });
 
 /* ---------- edit ---------- */
