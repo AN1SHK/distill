@@ -112,7 +112,6 @@
         <button class="pill ghost" id="editBtn">Edit</button>
         <button class="pill ghost" onclick="go('feed')">Back</button>
       </div>
-      <p class="sub" id="hOne" style="margin-top:14px">Copies the prompt and opens Claude. Paste it in and explain like you would to a child — voice mode is best.</p>
     </div>
   </section>
 
@@ -206,19 +205,20 @@ const uuid=()=>(crypto.randomUUID?crypto.randomUUID():
 
 /* ---------- teaching prompt ---------- */
 function teachPrompt(a){
-  return `You are a curious six-year-old. I just read "${a.book}" and I'm going to explain something I learned to you, because if I can't make a child understand it, I don't understand it.
+  return `You are a curious six-year-old. I'm going to explain one idea to you until you truly get it. The idea:
 
-What I'm trying to explain: "${a.aha}"
+"${a.aha}"
 
 Rules:
-- You know nothing about the topic. You only know what a six-year-old knows.
-- Ask ONE short question at a time, about the thing you didn't get.
-- If I use a big word, ask what it means. If I'm vague, say "I don't get it" and point at the part.
-- Never explain anything to me. Never use words I haven't used. You're the student.
-- Be a real kid: curious, literal, a little stubborn. "Why?" is always allowed.
-- When you finally get it, prove it: say the whole thing back in your own kid words. If you can say it right, we're done.
+- Everything stays on that one idea. If I drift, pull me back to it.
+- You only know what a six-year-old knows.
+- Ask ONE short question at a time, always about the part of my explanation you didn't get.
+- If I use a big word, ask what it means. If I'm vague, say "I don't get it" and point at the exact part.
+- Never explain anything to me. Never use words I haven't used. You're the student, I'm the teacher.
+- Be a real kid: curious, literal, stubborn. "Why?" is always allowed.
+- When you finally get it, prove it: say the idea back in your own kid words. If you can, we're done.
 
-Start by asking me to explain it.`;
+Start by asking me to explain the idea.`;
 }
 
 /* ---------- teaching link ---------- */
@@ -321,7 +321,6 @@ function feed(){
 
 function open_(i){cur=i;const a=ahas[i];
   $("oneBook").textContent=a.book;$("oneAha").textContent=a.aha;
-  $("hOne").textContent="Copies the prompt and opens Claude. Paste it in and explain like you would to a child — voice mode is best.";
   $("teach").href=CP.url||"https://claude.ai/new";
   go("one")}
 
@@ -329,7 +328,6 @@ function open_(i){cur=i;const a=ahas[i];
 $("teach").addEventListener("click",()=>{
   const a=ahas[cur];
   try{navigator.clipboard.writeText(teachPrompt(a))}catch(e){}
-  $("hOne").textContent="Prompt copied — paste it into a new chat in the project.";
 });
 
 /* ---------- edit ---------- */
