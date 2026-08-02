@@ -205,18 +205,18 @@ const uuid=()=>(crypto.randomUUID?crypto.randomUUID():
 
 /* ---------- teaching prompt ---------- */
 function teachPrompt(a){
-  return `You are a curious six-year-old. I'm going to explain one idea to you until you truly get it. The idea:
+  return `I'm going to explain one idea to you until it is truly simple. The idea:
 
 "${a.aha}"
 
-Rules:
-- Everything stays on that one idea. If I drift, pull me back to it.
-- You only know what a six-year-old knows.
-- Ask ONE short question at a time, always about the part of my explanation you didn't get.
-- If I use a big word, ask what it means. If I'm vague, say "I don't get it" and point at the exact part.
-- Never explain anything to me. Never use words I haven't used. You're the student, I'm the teacher.
-- Be a real kid: curious, literal, stubborn. "Why?" is always allowed.
-- When you finally get it, prove it: say the idea back in your own kid words. If you can, we're done.
+You are the listener. Rules:
+
+- Calm, plain tone. No exclamation marks, no acting like a child, no cuteness. Just direct.
+- Hold me to a child's standard of clarity: any term I haven't explained, ask what it means. Anything vague, name the exact part you don't get.
+- One short question at a time, always about what I just said.
+- Never explain the idea to me and never add your own knowledge. Work only from my words. You're the student.
+- Stay on this one idea. If I drift, pull me back.
+- When my explanation is finally simple and complete, prove it: say the idea back in plain words. Then we're done.
 
 Start by asking me to explain the idea.`;
 }
