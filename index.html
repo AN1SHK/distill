@@ -279,12 +279,14 @@ async function sync(loud){
     rows.forEach(row=>{
       if(row.id===SETTINGS_ID||row.aha==="__settings__")return;
       const l=byId.get(row.id);
+      const del=!!(row.sessions&&row.sessions.deleted);
       if(!l||String(row.updated_at)>String(l.updated_at||""))
         byId.set(row.id,{id:row.id,aha:row.aha,book:row.book||"",updated_at:row.updated_at,
-                         created:l&&l.created});
+                         created:l&&l.created,deleted:del});
     });
     ahas=[...byId.values()].sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
-    const out=ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at}));
+    const out=ahas.map(a=>{const r={id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at};
+      if(a.deleted)r.sessions={deleted:true};return r});
     if(CP.url)out.push({id:SETTINGS_ID,aha:"__settings__",book:"",
       sessions:{projectUrl:CP.url},updated_at:CP.at||now()});
     const w=await fetch(REST()+"?on_conflict=id",{method:"POST",
@@ -295,32 +297,29 @@ async function sync(loud){
   }catch(e){setSync("Offline — saved here, will sync later");console.warn(e)}
   syncing=false}
 
-async function remoteDelete(id){
-  if(!SB.on)return;
-  try{await fetch(REST()+"?id=eq."+id,{method:"DELETE",headers:head()})}catch(e){console.warn(e)}}
-
 /* ---------- views ---------- */
 const V={feed:"feedwrap",one:"one",edit:"edit2",setup:"setup"};
 function go(v){Object.entries(V).forEach(([k,id])=>$(id).classList.toggle("hide",k!==v));
-  $("books").innerHTML=[...new Set(ahas.map(a=>a.book))].map(b=>`<option value="${esc(b)}">`).join("");
+  $("books").innerHTML=[...new Set(ahas.filter(a=>!a.deleted).map(a=>a.book))].map(b=>`<option value="${esc(b)}">`).join("");
   if(v==="feed")feed();
   window.scrollTo({top:0})}
 
 function clearQ(){$("q").value="";$("bookFilter").value="";feed()}
-function bookList(){const m=new Map();ahas.forEach(a=>m.set(a.book,(m.get(a.book)||0)+1));
+function bookList(){const m=new Map();ahas.forEach(a=>{if(!a.deleted)m.set(a.book,(m.get(a.book)||0)+1)});
   return [...m.entries()].sort((x,y)=>x[0].localeCompare(y[0]))}
 
 function feed(){
   const sel=$("bookFilter"),keep=sel.value;
-  sel.innerHTML=`<option value="">All books · ${ahas.length}</option>`+
+  const liveN=ahas.filter(a=>!a.deleted).length;
+  sel.innerHTML=`<option value="">All books · ${liveN}</option>`+
     bookList().map(([b,n])=>`<option value="${esc(b)}">${esc(b)} · ${n}</option>`).join("");
   sel.value=bookList().some(([b])=>b===keep)?keep:"";
   sel.classList.toggle("on",!!sel.value);
   const book=sel.value,q=$("q").value.trim().toLowerCase();
-  const list=ahas.map((a,i)=>({a,i}))
+  const list=ahas.map((a,i)=>({a,i})).filter(({a})=>!a.deleted)
     .filter(({a})=>(!book||a.book===book)&&(!q||a.aha.toLowerCase().includes(q)||a.book.toLowerCase().includes(q)));
   $("clearq").classList.toggle("hide",!q&&!book);
-  $("count").textContent=(q||book)?`${list.length} of ${ahas.length}`:"";
+  $("count").textContent=(q||book)?`${list.length} of ${liveN}`:"";
   const hl=t=>{if(!q)return esc(t);const i=t.toLowerCase().indexOf(q);if(i<0)return esc(t);
     return esc(t.slice(0,i))+"<mark>"+esc(t.slice(i,i+q.length))+"</mark>"+esc(t.slice(i+q.length))};
   $("feed").innerHTML=(list.length?list.map(({a,i})=>`
@@ -356,7 +355,8 @@ $("saveOne").onclick=()=>{
 $("del").onclick=()=>{
   if(editing==null)return;
   if(!confirm("Delete this insight?"))return;
-  const [gone]=ahas.splice(editing,1);save();remoteDelete(gone.id);go("feed")};
+  const a=ahas[editing];a.deleted=true;a.updated_at=now();
+  save();sync();go("feed")};
 
 /* ---------- settings ---------- */
 $("saveProj").onclick=()=>{
@@ -393,7 +393,7 @@ $("bookFilter").addEventListener("change",feed);
 (function(){
   const d=load();
   if(d){
-    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at,created:a.created}));
+    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at,created:a.created,deleted:a.deleted}));
     SB.url=d.sburl||"";SB.key=d.sbkey||"";SB.on=!!(d.sbon&&SB.url&&SB.key);
     CP.url=d.cproj||"";CP.at=d.cprojAt||"";
     $("sburl").value=SB.url;$("sbkey").value=SB.key;$("cproj").value=CP.url;
@@ -403,6 +403,10 @@ $("bookFilter").addEventListener("change",feed);
   go("feed");
   if(SB.on)sync();
   window.addEventListener("online",()=>sync());
+  /* fast sync: re-pull whenever the app comes back to the front, and every 30s while open */
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
+  window.addEventListener("focus",()=>sync());
+  setInterval(()=>{if(!document.hidden)sync()},30000);
 })();
 </script>
 </body>
