@@ -29,11 +29,13 @@
   .card.click:hover{background:#fbfaf8}
   .lab{font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--slate);margin:0 0 8px}
   .aha{font-size:17px;line-height:1.5;color:var(--text);margin:0}
+  .big{font-size:19px;line-height:1.5;color:var(--slate);font-weight:500;margin:0}
   .sub{font-size:14px;color:var(--faint);margin:6px 0 0}
 
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;align-items:center}
   .pill{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
-        background:var(--pill);color:var(--slate);border:0;border-radius:4px;padding:7px 12px;cursor:pointer;line-height:1.4}
+        background:var(--pill);color:var(--slate);border:0;border-radius:4px;padding:7px 12px;cursor:pointer;
+        line-height:1.4;text-decoration:none;display:inline-block}
   .pill:hover{background:#dfe4ea}
   .pill.solid{background:var(--slate);color:#fff}
   .pill.solid:hover{background:#48525f}
@@ -100,11 +102,25 @@
     <p class="sub" style="margin-top:22px"><span class="link" onclick="go('setup')">Settings</span></p>
   </section>
 
+  <!-- ---------- teach ---------- -->
+  <section id="one" class="hide">
+    <div class="card">
+      <div class="lab" id="oneBook"></div>
+      <p class="big" id="oneAha"></p>
+      <div class="pills">
+        <a class="pill solid" id="teach" href="https://claude.ai/new" target="_blank" rel="noopener">Teach it &rsaquo;</a>
+        <button class="pill ghost" id="editBtn">Edit</button>
+        <button class="pill ghost" onclick="go('feed')">Back</button>
+      </div>
+      <p class="sub" id="hOne" style="margin-top:14px">Copies the prompt and opens Claude. Paste it in and explain like you would to a child — voice mode is best.</p>
+    </div>
+  </section>
+
   <!-- ---------- write / edit ---------- -->
-  <section id="edit" class="hide">
+  <section id="edit2" class="hide">
     <div class="card">
       <div class="field">
-        <div class="lab">Aha moment</div>
+        <div class="lab">Insight</div>
         <textarea id="aha" placeholder="Say it in one sentence."></textarea>
       </div>
       <div class="field">
@@ -114,7 +130,7 @@
       </div>
       <div class="pills">
         <button class="pill solid" id="saveOne">Save</button>
-        <button class="pill" onclick="go('feed')">Cancel</button>
+        <button class="pill" id="cancelEdit">Cancel</button>
         <button class="pill ghost hide" id="del">Delete</button>
         <span class="note" id="hEdit"></span>
       </div>
@@ -124,8 +140,22 @@
   <!-- ---------- settings ---------- -->
   <section id="setup" class="hide">
     <div class="card">
+      <div class="lab">Teaching</div>
+      <div class="field">
+        <div class="lab">Claude project link</div>
+        <input type="text" id="cproj" placeholder="https://claude.ai/project/…" autocomplete="off">
+        <p class="sub">On claude.ai, open your Reading project and copy the address. Teach it will open the
+        project directly — in the Claude app if it's installed. Syncs to your other devices.</p>
+      </div>
+      <div class="pills">
+        <button class="pill solid" id="saveProj">Save</button>
+        <span class="note" id="hP"></span>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="lab">Save forever</div>
-      <p class="aha" style="margin-bottom:18px">Point this at a free Supabase database and your aha moments live on a
+      <p class="aha" style="margin-bottom:18px">Point this at a free Supabase database and your insights live on a
       server — they survive clearing Safari, deleting the app, or a new phone, and sync between devices.</p>
       <div class="field">
         <div class="lab">1 · Run this once in the Supabase SQL editor</div>
@@ -146,9 +176,8 @@ create policy "anon all" on aha
         <input type="text" id="sburl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
       </div>
       <div class="field">
-        <div class="lab">3 · Anon public key</div>
-        <input type="password" id="sbkey" placeholder="eyJhbGci..." autocomplete="off">
-        <p class="sub">Settings → API → Project API keys → anon public. Stored on this device only.</p>
+        <div class="lab">3 · Publishable / anon key</div>
+        <input type="password" id="sbkey" placeholder="sb_publishable_..." autocomplete="off">
       </div>
       <div class="pills">
         <button class="pill solid" id="cloudon">Connect</button>
@@ -175,13 +204,36 @@ const uuid=()=>(crypto.randomUUID?crypto.randomUUID():
   "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
     const r=Math.random()*16|0;return (c==="x"?r:(r&0x3|0x8)).toString(16)}));
 
+/* ---------- teaching prompt ---------- */
+function teachPrompt(a){
+  return `You are a curious six-year-old. I just read "${a.book}" and I'm going to explain something I learned to you, because if I can't make a child understand it, I don't understand it.
+
+What I'm trying to explain: "${a.aha}"
+
+Rules:
+- You know nothing about the topic. You only know what a six-year-old knows.
+- Ask ONE short question at a time, about the thing you didn't get.
+- If I use a big word, ask what it means. If I'm vague, say "I don't get it" and point at the part.
+- Never explain anything to me. Never use words I haven't used. You're the student.
+- Be a real kid: curious, literal, a little stubborn. "Why?" is always allowed.
+- When you finally get it, prove it: say the whole thing back in your own kid words. If you can say it right, we're done.
+
+Start by asking me to explain it.`;
+}
+
+/* ---------- teaching link ---------- */
+const CP={url:"",at:""};
+const SETTINGS_ID="00000000-0000-4000-8000-00000000ffff";
+
 /* ---------- local ---------- */
-const KEY="distill.v3";
+const KEY="distill.v5";
 let canStore=true;
 try{localStorage.setItem(KEY+".t","1");localStorage.removeItem(KEY+".t")}catch(e){canStore=false}
 function save(){if(!canStore)return;
-  try{localStorage.setItem(KEY,JSON.stringify({ahas,sburl:SB.url,sbkey:SB.key,sbon:SB.on}))}catch(e){canStore=false}}
-function load(){if(!canStore)return null;try{return JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){return null}}
+  try{localStorage.setItem(KEY,JSON.stringify({ahas,cproj:CP.url,cprojAt:CP.at,
+    sburl:SB.url,sbkey:SB.key,sbon:SB.on}))}catch(e){canStore=false}}
+function load(){if(!canStore)return null;
+  try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("distill.v3")||"null")}catch(e){return null}}
 
 let ahas=[
  {id:"00000000-0000-4000-8000-000000000001",updated_at:"2000-01-01T00:00:00.000Z",
@@ -191,7 +243,7 @@ let ahas=[
   aha:"Money is the biggest story we all agreed to believe at the same time.",
   book:"Sapiens — Yuval Noah Harari"}
 ];
-let editing=null;
+let cur=null, editing=null;
 
 /* ---------- supabase ---------- */
 const SB={url:"",key:"",on:false};
@@ -208,17 +260,24 @@ async function sync(loud){
     ahas.forEach(stamp);
     const r=await fetch(REST()+"?select=*",{headers:head()});
     if(!r.ok)throw new Error((await r.text()).slice(0,90));
+    const rows=await r.json();
+    const rs=rows.find(x=>x.id===SETTINGS_ID);
+    if(rs&&rs.sessions&&rs.sessions.projectUrl!==undefined&&String(rs.updated_at)>String(CP.at||"")){
+      CP.url=rs.sessions.projectUrl||"";CP.at=rs.updated_at;$("cproj").value=CP.url}
     const byId=new Map(ahas.map(a=>[a.id,a]));
-    (await r.json()).forEach(row=>{
-      if(row.deleted){byId.delete(row.id);return}
+    rows.forEach(row=>{
+      if(row.id===SETTINGS_ID||row.aha==="__settings__")return;
       const l=byId.get(row.id);
       if(!l||String(row.updated_at)>String(l.updated_at||""))
         byId.set(row.id,{id:row.id,aha:row.aha,book:row.book||"",updated_at:row.updated_at});
     });
     ahas=[...byId.values()].sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
+    const out=ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at}));
+    if(CP.url)out.push({id:SETTINGS_ID,aha:"__settings__",book:"",
+      sessions:{projectUrl:CP.url},updated_at:CP.at||now()});
     const w=await fetch(REST()+"?on_conflict=id",{method:"POST",
       headers:head({Prefer:"resolution=merge-duplicates,return=minimal"}),
-      body:JSON.stringify(ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at})))});
+      body:JSON.stringify(out)});
     if(!w.ok)throw new Error((await w.text()).slice(0,90));
     save();feed();setSync("");
   }catch(e){setSync("Offline — saved here, will sync later");console.warn(e)}
@@ -229,7 +288,7 @@ async function remoteDelete(id){
   try{await fetch(REST()+"?id=eq."+id,{method:"DELETE",headers:head()})}catch(e){console.warn(e)}}
 
 /* ---------- views ---------- */
-const V={feed:"feedwrap",edit:"edit",setup:"setup"};
+const V={feed:"feedwrap",one:"one",edit:"edit2",setup:"setup"};
 function go(v){Object.entries(V).forEach(([k,id])=>$(id).classList.toggle("hide",k!==v));
   $("books").innerHTML=[...new Set(ahas.map(a=>a.book))].map(b=>`<option value="${esc(b)}">`).join("");
   if(v==="feed")feed();
@@ -245,7 +304,6 @@ function feed(){
     bookList().map(([b,n])=>`<option value="${esc(b)}">${esc(b)} · ${n}</option>`).join("");
   sel.value=bookList().some(([b])=>b===keep)?keep:"";
   sel.classList.toggle("on",!!sel.value);
-
   const book=sel.value,q=$("q").value.trim().toLowerCase();
   const list=ahas.map((a,i)=>({a,i}))
     .filter(({a})=>(!book||a.book===book)&&(!q||a.aha.toLowerCase().includes(q)||a.book.toLowerCase().includes(q)));
@@ -253,38 +311,51 @@ function feed(){
   $("count").textContent=(q||book)?`${list.length} of ${ahas.length}`:"";
   const hl=t=>{if(!q)return esc(t);const i=t.toLowerCase().indexOf(q);if(i<0)return esc(t);
     return esc(t.slice(0,i))+"<mark>"+esc(t.slice(i,i+q.length))+"</mark>"+esc(t.slice(i+q.length))};
-
   $("feed").innerHTML=(list.length?list.map(({a,i})=>`
     <div class="card click fade" onclick="open_(${i})">
       ${book?"":`<div class="lab">${hl(a.book)}</div>`}
       <p class="aha">${hl(a.aha)}</p>
     </div>`).join("")
     :`<div class="card"><p class="aha">Nothing here yet.</p></div>`)+
-    `<div class="pills"><button class="pill solid" onclick="open_(null)">New</button></div>`}
+    `<div class="pills"><button class="pill solid" onclick="newOne()">New</button></div>`}
 
-function open_(i){
-  editing=i;
-  const a=i==null?{aha:"",book:""}:ahas[i];
+function open_(i){cur=i;const a=ahas[i];
+  $("oneBook").textContent=a.book;$("oneAha").textContent=a.aha;
+  $("hOne").textContent="Copies the prompt and opens Claude. Paste it in and explain like you would to a child — voice mode is best.";
+  $("teach").href=CP.url||"https://claude.ai/new";
+  go("one")}
+
+/* ---------- teach: copy prompt, let the anchor open Claude ---------- */
+$("teach").addEventListener("click",()=>{
+  const a=ahas[cur];
+  try{navigator.clipboard.writeText(teachPrompt(a))}catch(e){}
+  $("hOne").textContent="Prompt copied — paste it into a new chat in the project.";
+});
+
+/* ---------- edit ---------- */
+function newOne(){editing=null;$("aha").value="";$("book").value="";$("hEdit").textContent="";
+  $("del").classList.add("hide");go("edit");$("aha").focus()}
+$("editBtn").onclick=()=>{editing=cur;const a=ahas[cur];
   $("aha").value=a.aha;$("book").value=a.book;$("hEdit").textContent="";
-  $("del").classList.toggle("hide",i==null);
-  go("edit");$("aha").focus()}
-
+  $("del").classList.remove("hide");go("edit")};
+$("cancelEdit").onclick=()=>{editing==null?go("feed"):open_(editing)};
 $("saveOne").onclick=()=>{
   const aha=$("aha").value.trim(),book=$("book").value.trim();
   if(!aha){$("hEdit").textContent="Write it first";return}
-  if(editing==null) ahas.unshift(stamp({aha,book:book||"Untitled"}));
-  else Object.assign(ahas[editing],{aha,book:book||"Untitled",updated_at:now()});
-  save();sync();go("feed")};
-
+  if(editing==null){ahas.unshift(stamp({aha,book:book||"Untitled"}));save();sync();go("feed")}
+  else{Object.assign(ahas[editing],{aha,book:book||"Untitled",updated_at:now()});save();sync();open_(editing)}};
 $("del").onclick=()=>{
   if(editing==null)return;
-  if(!confirm("Delete this aha moment?"))return;
-  const [gone]=ahas.splice(editing,1);
-  save();remoteDelete(gone.id);go("feed")};
+  if(!confirm("Delete this insight?"))return;
+  const [gone]=ahas.splice(editing,1);save();remoteDelete(gone.id);go("feed")};
 
 /* ---------- settings ---------- */
-$("copysql").onclick=()=>navigator.clipboard.writeText($("sql").value)
-  .then(()=>{$("hC").textContent="SQL copied"});
+$("saveProj").onclick=()=>{
+  const u=$("cproj").value.trim();
+  CP.url=u;CP.at=now();save();sync();
+  $("hP").textContent=u?"Saved":"Cleared — Teach opens claude.ai/new";};
+
+$("copysql").onclick=()=>navigator.clipboard.writeText($("sql").value).then(()=>{$("hC").textContent="SQL copied"});
 $("cloudon").onclick=async()=>{
   const u=$("sburl").value.trim(),k=$("sbkey").value.trim();
   if(!u||!k){$("hC").textContent="Need both";return}
@@ -297,11 +368,11 @@ $("cloudon").onclick=async()=>{
     $("hC").textContent=
       /relation|does not exist/i.test(m)?"Table missing — run the SQL first":
       /failed to fetch|load failed/i.test(m)?"Can't reach it — check the URL, or you're offline":
-      /jwt|api key|401/i.test(m)?"Key rejected — use the anon public key":m.slice(0,70)}};
+      /jwt|api key|401/i.test(m)?"Key rejected — use the publishable key":m.slice(0,70)}};
 $("cloudoff").onclick=()=>{SB.on=false;save();$("hC").textContent="Saved on this device only"};
 $("syncnow").onclick=()=>sync(true);
 $("forget").onclick=()=>{
-  if(!confirm("Erase everything stored on this device? Anything already synced stays in your database."))return;
+  if(!confirm("Erase everything stored on this device? Insights already synced stay in your database."))return;
   try{localStorage.removeItem(KEY)}catch(e){}
   ahas=[];SB.on=false;save();go("feed")};
 
@@ -315,7 +386,8 @@ $("bookFilter").addEventListener("change",feed);
   if(d){
     if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at}));
     SB.url=d.sburl||"";SB.key=d.sbkey||"";SB.on=!!(d.sbon&&SB.url&&SB.key);
-    $("sburl").value=SB.url;$("sbkey").value=SB.key;
+    CP.url=d.cproj||"";CP.at=d.cprojAt||"";
+    $("sburl").value=SB.url;$("sbkey").value=SB.key;$("cproj").value=CP.url;
   }
   ahas.forEach(stamp);
   if(!canStore)$("hC").textContent="Storage blocked — this session only";
