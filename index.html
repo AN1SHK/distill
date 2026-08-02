@@ -21,13 +21,16 @@
         padding:max(28px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-left))
                 calc(120px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-right))}
 
-  .brand{display:block;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  .brand{display:block;text-align:center;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
          color:var(--slate);cursor:pointer;margin-bottom:30px}
 
   .card{background:var(--card);padding:22px 24px;margin-bottom:var(--gap)}
   .card.click{cursor:pointer}
   .card.click:hover{background:#fbfaf8}
   .lab{font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:var(--slate);margin:0 0 8px}
+  .labrow{display:flex;align-items:baseline;gap:12px;margin:0 0 8px}
+  .labrow .lab{margin:0}
+  .date{font-size:12px;color:var(--faint);margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums}
   .aha{font-size:17px;line-height:1.5;color:var(--text);margin:0}
   .big{font-size:19px;line-height:1.5;color:var(--slate);font-weight:500;margin:0}
   .sub{font-size:14px;color:var(--faint);margin:6px 0 0}
@@ -124,7 +127,7 @@
       </div>
       <div class="field">
         <div class="lab">Book</div>
-        <input type="text" id="book" list="books" placeholder="The Beginning of Infinity — David Deutsch" autocomplete="off">
+        <input type="text" id="book" list="books" autocomplete="off">
         <datalist id="books"></datalist>
       </div>
       <div class="pills">
@@ -253,7 +256,11 @@ let cur=null, editing=null;
 const SB={url:"",key:"",on:false};
 const head=x=>Object.assign({apikey:SB.key,Authorization:"Bearer "+SB.key,"content-type":"application/json"},x||{});
 const REST=()=>SB.url.replace(/\/+$/,"")+"/rest/v1/aha";
-const stamp=a=>{if(!a.id)a.id=uuid();if(!a.updated_at)a.updated_at=now();return a};
+const stamp=a=>{if(!a.id)a.id=uuid();if(!a.updated_at)a.updated_at=now();
+  if(!a.created)a.created=a.updated_at;return a};
+const fmtDate=iso=>{const d=new Date(iso);if(isNaN(d))return"";
+  const p=n=>String(n).padStart(2,"0");
+  return p(d.getMonth()+1)+"/"+p(d.getDate())+"/"+String(d.getFullYear()).slice(-2)};
 function setSync(t){$("syncline").textContent=t;$("hC").textContent=t}
 
 let syncing=false;
@@ -273,7 +280,8 @@ async function sync(loud){
       if(row.id===SETTINGS_ID||row.aha==="__settings__")return;
       const l=byId.get(row.id);
       if(!l||String(row.updated_at)>String(l.updated_at||""))
-        byId.set(row.id,{id:row.id,aha:row.aha,book:row.book||"",updated_at:row.updated_at});
+        byId.set(row.id,{id:row.id,aha:row.aha,book:row.book||"",updated_at:row.updated_at,
+                         created:l&&l.created});
     });
     ahas=[...byId.values()].sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
     const out=ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at}));
@@ -317,7 +325,7 @@ function feed(){
     return esc(t.slice(0,i))+"<mark>"+esc(t.slice(i,i+q.length))+"</mark>"+esc(t.slice(i+q.length))};
   $("feed").innerHTML=(list.length?list.map(({a,i})=>`
     <div class="card click fade" onclick="open_(${i})">
-      ${book?"":`<div class="lab">${hl(a.book)}</div>`}
+      <div class="labrow">${book?"":`<div class="lab">${hl(a.book)}</div>`}<span class="date">${fmtDate(a.created||a.updated_at)}</span></div>
       <p class="aha">${hl(a.aha)}</p>
     </div>`).join("")
     :`<div class="card"><p class="aha">Nothing here yet.</p></div>`)+
@@ -328,17 +336,9 @@ function open_(i){cur=i;const a=ahas[i];
   $("teach").href=CP.url||"https://claude.ai/new";
   go("one")}
 
-/* ---------- teach: copy prompt; open Claude only where a link can reach the app ---------- */
-const DESKTOP=!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-$("teach").addEventListener("click",e=>{
-  const a=ahas[cur];
-  try{navigator.clipboard.writeText(teachPrompt(a))}catch(err){}
-  if(DESKTOP){
-    e.preventDefault();
-    const t=$("teach");
-    t.textContent="Copied — \u2318Tab to Claude and paste";
-    setTimeout(()=>{t.innerHTML="Teach it &rsaquo;"},2600);
-  }
+/* ---------- teach: copy prompt, anchor opens Claude ---------- */
+$("teach").addEventListener("click",()=>{
+  try{navigator.clipboard.writeText(teachPrompt(ahas[cur]))}catch(err){}
 });
 
 /* ---------- edit ---------- */
@@ -393,7 +393,7 @@ $("bookFilter").addEventListener("change",feed);
 (function(){
   const d=load();
   if(d){
-    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at}));
+    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at,created:a.created}));
     SB.url=d.sburl||"";SB.key=d.sbkey||"";SB.on=!!(d.sbon&&SB.url&&SB.key);
     CP.url=d.cproj||"";CP.at=d.cprojAt||"";
     $("sburl").value=SB.url;$("sbkey").value=SB.key;$("cproj").value=CP.url;
