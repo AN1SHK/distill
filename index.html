@@ -233,7 +233,7 @@ const fmtDate=iso=>{const d=new Date(iso);if(isNaN(d))return"";
 /* ---------- drill prompt (reviews: retrieval + application) ---------- */
 function drillPrompt(a){
   const t=a.aha.length>60?a.aha.slice(0,57)+"\u2026":a.aha;
-  return `Title this chat exactly: Distill drill \u2014 ${t}
+  return `Distill drill \u2014 ${t}
 
 This is a review drill, not a first lesson. The idea I'm training:
 
@@ -259,7 +259,7 @@ Rules:
 /* ---------- teaching prompt ---------- */
 function teachPrompt(a){
   const t=a.aha.length>60?a.aha.slice(0,57)+"\u2026":a.aha;
-  return `Title this chat exactly: Distill \u2014 ${t}
+  return `Distill \u2014 ${t}
 
 I'm going to explain one idea to you until it is truly simple. The idea:
 
