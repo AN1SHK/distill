@@ -58,6 +58,7 @@
 
   .search{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
   .search input{flex:1 1 200px;width:auto;background:var(--card);font-size:15px;padding:12px 16px}
+  #newBtn{padding:12px 18px}
   .search select{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
     color:var(--slate);background:var(--pill);border:0;border-radius:4px;padding:12px 34px 12px 14px;cursor:pointer;
     outline:none;max-width:260px;appearance:none;-webkit-appearance:none;
@@ -95,6 +96,7 @@
   <!-- ---------- list ---------- -->
   <section id="feedwrap">
     <div class="search">
+      <button class="pill solid" id="newBtn" onclick="newOne()">New</button>
       <select id="bookFilter"></select>
       <input type="text" id="q" placeholder="Search insights" autocomplete="off">
       <button class="pill ghost hide" id="clearq" onclick="clearQ()">Clear</button>
@@ -354,8 +356,7 @@ function feed(){
       <div class="labrow">${book?"":`<div class="lab">${hl(a.book)}</div>`}<span class="date">${fmtDate(a.created||a.updated_at)}</span></div>
       <p class="aha">${hl(a.aha)}</p>
     </div>`).join("")
-    :`<div class="card"><p class="aha">Nothing here yet.</p></div>`)+
-    `<div class="pills"><button class="pill solid" onclick="newOne()">New</button></div>`}
+    :`<div class="card"><p class="aha">Nothing here yet.</p></div>`)}
 
 function open_(i){cur=i;const a=ahas[i];
   $("oneBook").textContent=a.book;$("oneAha").textContent=a.aha;
