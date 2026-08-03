@@ -146,8 +146,8 @@
       <div class="field">
         <div class="lab">Claude project link</div>
         <input type="text" id="cproj" placeholder="https://claude.ai/project/…" autocomplete="off">
-        <p class="sub">On claude.ai, open your Reading project and copy the address. Teach it will open the
-        project directly — in the Claude app if it's installed. Syncs to your other devices.</p>
+        <p class="sub">On claude.ai, open your Reading project and copy the address. Teach it opens it directly.
+        Syncs to your other devices.</p>
       </div>
       <div class="pills">
         <button class="pill solid" id="saveProj">Save</button>
@@ -156,39 +156,33 @@
     </div>
 
     <div class="card">
-      <div class="lab">Save forever</div>
-      <p class="aha" style="margin-bottom:18px">Point this at a free Supabase database and your insights live on a
-      server — they survive clearing Safari, deleting the app, or a new phone, and sync between devices.</p>
+      <div class="lab">Save forever · Firebase</div>
       <div class="field">
-        <div class="lab">1 · Run this once in the Supabase SQL editor</div>
-        <textarea id="sql" readonly style="min-height:150px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5">create table if not exists aha (
-  id uuid primary key,
-  aha text not null,
-  book text,
-  sessions jsonb not null default '[]'::jsonb,
-  updated_at timestamptz not null default now()
-);
-alter table aha enable row level security;
-create policy "anon all" on aha
-  for all to anon using (true) with check (true);</textarea>
-        <div class="pills"><button class="pill" id="copysql">Copy SQL</button></div>
+        <div class="lab">1 · One-time setup</div>
+        <p class="sub" style="margin:0 0 10px">console.firebase.google.com → Add project → Build → Firestore Database
+        → Create database (production mode). Then open the Rules tab, replace everything with this, and Publish:</p>
+        <textarea id="rules" readonly style="min-height:140px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /insights/{id} {
+      allow read, write: if true;
+    }
+  }
+}</textarea>
+        <div class="pills"><button class="pill" id="copyrules">Copy rules</button></div>
       </div>
       <div class="field">
-        <div class="lab">2 · Project URL</div>
-        <input type="text" id="sburl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
-      </div>
-      <div class="field">
-        <div class="lab">3 · Publishable / anon key</div>
-        <input type="password" id="sbkey" placeholder="sb_publishable_..." autocomplete="off">
+        <div class="lab">2 · Paste your firebaseConfig</div>
+        <textarea id="fbcfg" placeholder="Project settings → Your apps → Web (</>) → copy the firebaseConfig block and paste the whole thing here" style="min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:13px"></textarea>
       </div>
       <div class="pills">
-        <button class="pill solid" id="cloudon">Connect</button>
-        <button class="pill" id="cloudoff">Disconnect</button>
-        <button class="pill" id="syncnow">Sync now</button>
+        <button class="pill solid" id="fbon">Connect</button>
+        <button class="pill" id="fboff">Disconnect</button>
         <button class="pill" onclick="go('feed')">Back</button>
         <span class="note" id="hC"></span>
       </div>
     </div>
+
     <div class="card">
       <div class="pills" style="margin:0">
         <button class="pill ghost" id="forget">Erase everything on this device</button>
@@ -205,6 +199,11 @@ const now=()=>new Date().toISOString();
 const uuid=()=>(crypto.randomUUID?crypto.randomUUID():
   "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
     const r=Math.random()*16|0;return (c==="x"?r:(r&0x3|0x8)).toString(16)}));
+const stamp=a=>{if(!a.id)a.id=uuid();if(!a.updated_at)a.updated_at=now();
+  if(!a.created)a.created=a.updated_at;return a};
+const fmtDate=iso=>{const d=new Date(iso);if(isNaN(d))return"";
+  const p=n=>String(n).padStart(2,"0");
+  return p(d.getMonth()+1)+"/"+p(d.getDate())+"/"+String(d.getFullYear()).slice(-2)};
 
 /* ---------- teaching prompt ---------- */
 function teachPrompt(a){
@@ -228,19 +227,18 @@ You are the listener. Rules:
 Start by asking me to explain the idea.`;
 }
 
-/* ---------- teaching link ---------- */
+/* ---------- state ---------- */
 const CP={url:"",at:""};
-const SETTINGS_ID="00000000-0000-4000-8000-00000000ffff";
+const FB={apiKey:"",projectId:"",on:false,app:null,db:null,fns:null,unsub:null};
 
-/* ---------- local ---------- */
-const KEY="distill.v5";
+const KEY="distill.v6";
 let canStore=true;
 try{localStorage.setItem(KEY+".t","1");localStorage.removeItem(KEY+".t")}catch(e){canStore=false}
 function save(){if(!canStore)return;
   try{localStorage.setItem(KEY,JSON.stringify({ahas,cproj:CP.url,cprojAt:CP.at,
-    sburl:SB.url,sbkey:SB.key,sbon:SB.on}))}catch(e){canStore=false}}
+    fbKey:FB.apiKey,fbProj:FB.projectId,fbOn:FB.on}))}catch(e){canStore=false}}
 function load(){if(!canStore)return null;
-  try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("distill.v3")||"null")}catch(e){return null}}
+  try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("distill.v5")||localStorage.getItem("distill.v3")||"null")}catch(e){return null}}
 
 let ahas=[
  {id:"00000000-0000-4000-8000-000000000001",updated_at:"2000-01-01T00:00:00.000Z",
@@ -252,50 +250,79 @@ let ahas=[
 ];
 let cur=null, editing=null;
 
-/* ---------- supabase ---------- */
-const SB={url:"",key:"",on:false};
-const head=x=>Object.assign({apikey:SB.key,Authorization:"Bearer "+SB.key,"content-type":"application/json"},x||{});
-const REST=()=>SB.url.replace(/\/+$/,"")+"/rest/v1/aha";
-const stamp=a=>{if(!a.id)a.id=uuid();if(!a.updated_at)a.updated_at=now();
-  if(!a.created)a.created=a.updated_at;return a};
-const fmtDate=iso=>{const d=new Date(iso);if(isNaN(d))return"";
-  const p=n=>String(n).padStart(2,"0");
-  return p(d.getMonth()+1)+"/"+p(d.getDate())+"/"+String(d.getFullYear()).slice(-2)};
+/* ---------- Firebase (realtime) ---------- */
+const FBV="10.12.2";
 function setSync(t){$("syncline").textContent=t;$("hC").textContent=t}
 
-let syncing=false;
-async function sync(loud){
-  if(!SB.on||syncing)return;
-  syncing=true; if(loud)setSync("Syncing…");
+function parseCfg(t){
+  const g=k=>{const m=String(t).match(new RegExp(k+"\\s*[:=]\\s*[\"']([^\"']+)[\"']"));return m?m[1]:""}
+  return {apiKey:g("apiKey"),projectId:g("projectId")}}
+
+async function fbInit(){
+  const [appM,fsM]=await Promise.all([
+    import("https://www.gstatic.com/firebasejs/"+FBV+"/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/"+FBV+"/firebase-firestore.js")]);
+  FB.app=appM.initializeApp({apiKey:FB.apiKey,projectId:FB.projectId},"d"+Math.random().toString(36).slice(2));
+  FB.db=fsM.getFirestore(FB.app);
+  FB.fns=fsM;}
+
+function docRef(id){return FB.fns.doc(FB.db,"insights",id)}
+
+async function fbPush(a){
+  if(!FB.on||!FB.db)return;
+  try{await FB.fns.setDoc(docRef(a.id),{aha:a.aha,book:a.book||"",updated_at:a.updated_at,
+    created:a.created||a.updated_at,deleted:!!a.deleted})}
+  catch(e){console.warn(e);setSync("Offline — saved here, will sync when back")}}
+
+async function fbPushSettings(){
+  if(!FB.on||!FB.db)return;
+  try{await FB.fns.setDoc(docRef("_settings"),{projectUrl:CP.url||"",updated_at:CP.at||now()})}
+  catch(e){console.warn(e)}}
+
+function adopt(id,d){
+  if(id==="_settings"){
+    if(d.projectUrl!==undefined&&String(d.updated_at||"")>String(CP.at||"")){
+      CP.url=d.projectUrl||"";CP.at=d.updated_at||now();$("cproj").value=CP.url;return true}
+    return false}
+  const l=ahas.find(x=>x.id===id);
+  if(!l){ahas.push({id,aha:d.aha,book:d.book||"",updated_at:d.updated_at,
+    created:d.created||d.updated_at,deleted:!!d.deleted});return true}
+  if(String(d.updated_at||"")>String(l.updated_at||"")){
+    Object.assign(l,{aha:d.aha,book:d.book||"",updated_at:d.updated_at,
+      deleted:!!d.deleted,created:l.created||d.created});return true}
+  return false}
+
+function fbListen(){
+  if(FB.unsub){try{FB.unsub()}catch(e){}}
+  let first=true;
+  FB.unsub=FB.fns.onSnapshot(FB.fns.collection(FB.db,"insights"),snap=>{
+    let changed=false;
+    snap.docChanges().forEach(ch=>{if(adopt(ch.doc.id,ch.doc.data()))changed=true});
+    if(first){
+      first=false;
+      const remote=new Map(snap.docs.map(dd=>[dd.id,dd.data()]));
+      ahas.forEach(a=>{const r=remote.get(a.id);
+        if(!r||String(a.updated_at)>String(r.updated_at||""))fbPush(a)});
+      const rs=remote.get("_settings");
+      if(CP.url&&(!rs||String(CP.at)>String(rs.updated_at||"")))fbPushSettings();
+    }
+    if(changed){
+      ahas.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
+      save();feed()}
+    $("syncline").textContent="";
+  },err=>{console.warn(err);setSync("Offline — saved here, will sync when back")});}
+
+async function fbConnect(loud){
+  if(!FB.apiKey||!FB.projectId){if(loud)$("hC").textContent="Paste the firebaseConfig first";return}
   try{
-    ahas.forEach(stamp);
-    const r=await fetch(REST()+"?select=*",{headers:head()});
-    if(!r.ok)throw new Error((await r.text()).slice(0,90));
-    const rows=await r.json();
-    const rs=rows.find(x=>x.id===SETTINGS_ID);
-    if(rs&&rs.sessions&&rs.sessions.projectUrl!==undefined&&String(rs.updated_at)>String(CP.at||"")){
-      CP.url=rs.sessions.projectUrl||"";CP.at=rs.updated_at;$("cproj").value=CP.url}
-    const byId=new Map(ahas.map(a=>[a.id,a]));
-    rows.forEach(row=>{
-      if(row.id===SETTINGS_ID||row.aha==="__settings__")return;
-      const l=byId.get(row.id);
-      const del=!!(row.sessions&&row.sessions.deleted);
-      if(!l||String(row.updated_at)>String(l.updated_at||""))
-        byId.set(row.id,{id:row.id,aha:row.aha,book:row.book||"",updated_at:row.updated_at,
-                         created:l&&l.created,deleted:del});
-    });
-    ahas=[...byId.values()].sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
-    const out=ahas.map(a=>{const r={id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at};
-      if(a.deleted)r.sessions={deleted:true};return r});
-    if(CP.url)out.push({id:SETTINGS_ID,aha:"__settings__",book:"",
-      sessions:{projectUrl:CP.url},updated_at:CP.at||now()});
-    const w=await fetch(REST()+"?on_conflict=id",{method:"POST",
-      headers:head({Prefer:"resolution=merge-duplicates,return=minimal"}),
-      body:JSON.stringify(out)});
-    if(!w.ok)throw new Error((await w.text()).slice(0,90));
-    save();feed();setSync("");
-  }catch(e){setSync("Offline — saved here, will sync later");console.warn(e)}
-  syncing=false}
+    if(loud)$("hC").textContent="Connecting…";
+    if(!FB.db)await fbInit();
+    fbListen();
+    FB.on=true;save();
+    if(loud)$("hC").textContent="Connected · saving forever";
+  }catch(e){FB.on=false;
+    if(loud)$("hC").textContent=String((e&&e.message)||e).slice(0,80);
+    console.warn(e)}}
 
 /* ---------- views ---------- */
 const V={feed:"feedwrap",one:"one",edit:"edit2",setup:"setup"};
@@ -335,7 +362,6 @@ function open_(i){cur=i;const a=ahas[i];
   $("teach").href=CP.url||"https://claude.ai/new";
   go("one")}
 
-/* ---------- teach: copy prompt, anchor opens Claude ---------- */
 $("teach").addEventListener("click",()=>{
   try{navigator.clipboard.writeText(teachPrompt(ahas[cur]))}catch(err){}
 });
@@ -350,40 +376,38 @@ $("cancelEdit").onclick=()=>{editing==null?go("feed"):open_(editing)};
 $("saveOne").onclick=()=>{
   const aha=$("aha").value.trim(),book=$("book").value.trim();
   if(!aha){$("hEdit").textContent="Write it first";return}
-  if(editing==null){ahas.unshift(stamp({aha,book:book||"Untitled"}));save();sync();go("feed")}
-  else{Object.assign(ahas[editing],{aha,book:book||"Untitled",updated_at:now()});save();sync();open_(editing)}};
+  let rec;
+  if(editing==null){rec=stamp({aha,book:book||"Untitled"});ahas.unshift(rec)}
+  else{rec=ahas[editing];Object.assign(rec,{aha,book:book||"Untitled",updated_at:now()})}
+  save();fbPush(rec);
+  editing==null?go("feed"):open_(editing)};
 $("del").onclick=()=>{
   if(editing==null)return;
   if(!confirm("Delete this insight?"))return;
   const a=ahas[editing];a.deleted=true;a.updated_at=now();
-  save();sync();go("feed")};
+  save();fbPush(a);go("feed")};
 
 /* ---------- settings ---------- */
 $("saveProj").onclick=()=>{
-  const u=$("cproj").value.trim();
-  CP.url=u;CP.at=now();save();sync();
-  $("hP").textContent=u?"Saved":"Cleared — Teach opens claude.ai/new";};
+  CP.url=$("cproj").value.trim();CP.at=now();save();fbPushSettings();
+  $("hP").textContent=CP.url?"Saved":"Cleared — Teach opens claude.ai/new"};
 
-$("copysql").onclick=()=>navigator.clipboard.writeText($("sql").value).then(()=>{$("hC").textContent="SQL copied"});
-$("cloudon").onclick=async()=>{
-  const u=$("sburl").value.trim(),k=$("sbkey").value.trim();
-  if(!u||!k){$("hC").textContent="Need both";return}
-  SB.url=u;SB.key=k;$("hC").textContent="Checking";
-  try{
-    const r=await fetch(REST()+"?select=id&limit=1",{headers:head()});
-    if(!r.ok)throw new Error((await r.text()).slice(0,90));
-    SB.on=true;save();await sync(true);$("hC").textContent="Connected · saving forever";
-  }catch(e){SB.on=false;const m=String(e.message||"");
-    $("hC").textContent=
-      /relation|does not exist/i.test(m)?"Table missing — run the SQL first":
-      /failed to fetch|load failed/i.test(m)?"Can't reach it — check the URL, or you're offline":
-      /jwt|api key|401/i.test(m)?"Key rejected — use the publishable key":m.slice(0,70)}};
-$("cloudoff").onclick=()=>{SB.on=false;save();$("hC").textContent="Saved on this device only"};
-$("syncnow").onclick=()=>sync(true);
+$("copyrules").onclick=()=>navigator.clipboard.writeText($("rules").value)
+  .then(()=>{$("hC").textContent="Rules copied"});
+
+$("fbon").onclick=()=>{
+  const c=parseCfg($("fbcfg").value);
+  if(!c.apiKey||!c.projectId){$("hC").textContent="That doesn't look like a firebaseConfig";return}
+  FB.apiKey=c.apiKey;FB.projectId=c.projectId;FB.db=null;
+  fbConnect(true)};
+$("fboff").onclick=()=>{
+  if(FB.unsub){try{FB.unsub()}catch(e){}}
+  FB.unsub=null;FB.on=false;save();$("hC").textContent="Saved on this device only"};
 $("forget").onclick=()=>{
-  if(!confirm("Erase everything stored on this device? Insights already synced stay in your database."))return;
+  if(!confirm("Erase everything stored on this device? Insights already synced stay in Firebase."))return;
+  if(FB.unsub){try{FB.unsub()}catch(e){}}
   try{localStorage.removeItem(KEY)}catch(e){}
-  ahas=[];SB.on=false;save();go("feed")};
+  ahas=[];FB.on=false;FB.unsub=null;save();go("feed")};
 
 $("q").addEventListener("input",feed);
 $("q").addEventListener("keydown",e=>{if(e.key==="Escape")clearQ()});
@@ -393,20 +417,21 @@ $("bookFilter").addEventListener("change",feed);
 (function(){
   const d=load();
   if(d){
-    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,updated_at:a.updated_at,created:a.created,deleted:a.deleted}));
-    SB.url=d.sburl||"";SB.key=d.sbkey||"";SB.on=!!(d.sbon&&SB.url&&SB.key);
+    if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,
+      updated_at:a.updated_at,created:a.created,deleted:a.deleted}));
     CP.url=d.cproj||"";CP.at=d.cprojAt||"";
-    $("sburl").value=SB.url;$("sbkey").value=SB.key;$("cproj").value=CP.url;
+    FB.apiKey=d.fbKey||"";FB.projectId=d.fbProj||"";FB.on=!!(d.fbOn&&FB.apiKey&&FB.projectId);
+    $("cproj").value=CP.url;
+    if(FB.apiKey&&FB.projectId)$("fbcfg").value=JSON.stringify({apiKey:FB.apiKey,projectId:FB.projectId},null,2);
   }
   ahas.forEach(stamp);
   if(!canStore)$("hC").textContent="Storage blocked — this session only";
   go("feed");
-  if(SB.on)sync();
-  window.addEventListener("online",()=>sync());
-  /* fast sync: re-pull whenever the app comes back to the front, and every 30s while open */
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
-  window.addEventListener("focus",()=>sync());
-  setInterval(()=>{if(!document.hidden)sync()},30000);
+  if(FB.on)fbConnect(false);
+  const ensure=()=>{if(FB.on&&!FB.unsub)fbConnect(false)};
+  window.addEventListener("online",ensure);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)ensure()});
+  window.addEventListener("focus",ensure);
 })();
 </script>
 </body>
