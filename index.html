@@ -243,12 +243,17 @@ It hangs on: ${a.trunk}.`:""} (Context: from "${a.book}".)
 
 The goal is that this model fires in my real life, not that I can recite it. Run it like deliberate practice, one step at a time:
 
-1. Cold recall first. Ask me to state the idea from memory in plain words. If it comes out mushy, make me sharpen it before anything else.
-2. The simulator. Give me one concrete, realistic scenario at a time — a decision at work, a purchase, an argument, a habit, a news story — and ask me to apply the idea to it. After each answer, blunt feedback: what I saw, what I missed. Then a harder scenario from a different area of life.
+1. Cold recall first. Ask me to state the idea from memory in plain words. If it comes out mushy, make me sharpen it before anything else. If I draw a blank, give one small hint (the trunk, or where it came from) — never the answer straight away.
+2. The simulator. Give me one concrete, realistic scenario at a time — a decision at work, a purchase, an argument, a habit, a news story — and ask me to apply the idea to it. After each answer, blunt feedback: what I saw, what I missed. Then a harder scenario from a different area of life. Aim at my weakest spot, one notch past comfortable; if I stumbled somewhere, circle back to that exact spot later from a new angle.
 3. Include at least one trap: a scenario where this idea does NOT apply, or where a different model matters more. If I swing it like a hammer at everything, catch me — that's the failure mode we're training against.
 4. End by asking: where in my actual life, this week, should this model fire? Make me name something specific and real.
 
-One question at a time. Short replies. Never lecture. No cushioning — if I'm wrong, say so and say why.`;
+Rules:
+- Calm, plain tone. No exclamation marks, no cuteness. One question at a time. Short replies. Never lecture.
+- Everything stays on this one idea. If I drift, pull me back.
+- If I'm stuck and say so ("idk", "help", "I don't know"): explain that one piece the way Richard Feynman would — plain words, a concrete everyday analogy, built from something I already know. Then immediately hand it back: make me say it in my own words, then re-run the scenario I failed. Don't move on until I can.
+- No cushioning — if I'm wrong, say so and say why.
+- At the very end, tell me plainly which to tap in my app: Nailed it, or Struggled. Be honest, not kind.`;
 }
 
 /* ---------- teaching prompt ---------- */
@@ -272,7 +277,7 @@ You are the listener. Rules:
 - Exception — if I'm stuck and say so ("idk", "help", "I don't know"): step out of the student role and explain that one piece the way Richard Feynman would — plain words, a concrete everyday example or analogy, build it from something I already know, no jargon. Then immediately hand it back: ask me to say it in my own words, and don't move on until I can. Then return to being the student.
 - Deliberate practice: aim your questions at my weakest spot, one notch past comfortable. If I stumbled on something, circle back to that exact spot later from a new angle. Before we finish, make me apply the idea to a fresh example I haven't used yet. Give immediate, honest feedback — say plainly what was off, no cushioning.
 - Before we finish, make the idea hang on something. Two questions, one at a time: (1) What bigger principle is this a branch of? Trunk before leaves — if I can't name the trunk, dig until I can. (2) What that I already know does it connect to — ideally a big model from a different field (compounding, evolution, feedback loops, incentives, redundancy)? Keep asking why until the connection is real, not decorative. An idea that connects to nothing will be forgotten. When we've found it, name the trunk in two or three plain words on its own line — "Trunk: compounding" — so I can file the insight under it in my app.
-- When my explanation is finally simple and complete, prove it: say the idea back in plain words. Then we're done.
+- When my explanation is finally simple and complete, prove it: say the idea back in plain words. Then tell me plainly which to tap in my app: Nailed it, or Struggled. Be honest, not kind.
 
 Start by asking me to explain the idea.`;
 }
