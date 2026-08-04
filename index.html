@@ -31,7 +31,6 @@
   .labrow{display:flex;align-items:baseline;gap:12px;margin:0 0 8px}
   .labrow .lab{margin:0}
   .date{font-size:12px;color:var(--faint);margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums}
-  .date.due{color:var(--slate);font-weight:700;letter-spacing:.1em}
   .aha{font-size:17px;line-height:1.5;color:var(--text);margin:0}
   .big{font-size:19px;line-height:1.5;color:var(--slate);font-weight:500;margin:0}
   .sub{font-size:14px;color:var(--faint);margin:6px 0 0}
@@ -114,7 +113,7 @@
       <button class="pill solid" id="newBtn" onclick="newOne()">New</button>
       <button class="pill" id="viewBtn">Tree</button>
       <select id="bookFilter"></select>
-      <input type="text" id="q" placeholder="Search insights" autocomplete="off">
+      <input type="text" id="q" placeholder="Search aphorisms" autocomplete="off">
       <button class="pill ghost hide" id="clearq" onclick="clearQ()">Clear</button>
       <span class="note" id="count"></span>
     </div>
@@ -130,8 +129,6 @@
       <p class="big" id="oneAha"></p>
       <div class="pills">
         <a class="pill solid" id="teach" href="https://claude.ai/new" target="_blank" rel="noopener">Teach it &rsaquo;</a>
-        <button class="pill" id="passBtn">Nailed it</button>
-        <button class="pill" id="failBtn">Struggled</button>
         <button class="pill ghost" id="editBtn">Edit</button>
         <button class="pill ghost" onclick="go('feed')">Back</button>
       </div>
@@ -142,7 +139,7 @@
   <section id="edit2" class="hide">
     <div class="card">
       <div class="field">
-        <div class="lab">Insight</div>
+        <div class="lab">Aphorism</div>
         <textarea id="aha" placeholder="Say it in one sentence."></textarea>
       </div>
       <div class="field">
@@ -152,7 +149,7 @@
       </div>
       <div class="field">
         <div class="lab">Hangs on</div>
-        <input type="text" id="trunk" list="trunks" placeholder="The principle underneath — compounding, incentives, feedback loops…" autocomplete="off">
+        <input type="text" id="trunk" list="trunks" autocomplete="off">
         <datalist id="trunks"></datalist>
       </div>
       <div class="pills">
@@ -235,25 +232,27 @@ function drillPrompt(a){
   const t=a.aha.length>60?a.aha.slice(0,57)+"\u2026":a.aha;
   return `Distill drill \u2014 ${t}
 
-This is a review drill, not a first lesson. The idea I'm training:
+Review drill. The idea I'm training:
 
 "${a.aha}"${a.trunk?`
+It hangs on: ${a.trunk}.`:""} (From "${a.book}".)
 
-It hangs on: ${a.trunk}.`:""} (Context: from "${a.book}".)
+The goal is that this model fires in my real life, not that I can recite it. Structure:
 
-The goal is that this model fires in my real life, not that I can recite it. Run it like deliberate practice, one step at a time:
-
-1. Cold recall first. Ask me to state the idea from memory in plain words. If it comes out mushy, make me sharpen it before anything else. If I draw a blank, give one small hint (the trunk, or where it came from) — never the answer straight away.
-2. The simulator. Give me one concrete, realistic scenario at a time — a decision at work, a purchase, an argument, a habit, a news story — and ask me to apply the idea to it. After each answer, blunt feedback: what I saw, what I missed. Then a harder scenario from a different area of life. Aim at my weakest spot, one notch past comfortable; if I stumbled somewhere, circle back to that exact spot later from a new angle.
-3. Include at least one trap: a scenario where this idea does NOT apply, or where a different model matters more. If I swing it like a hammer at everything, catch me — that's the failure mode we're training against.
-4. End by asking: where in my actual life, this week, should this model fire? Make me name something specific and real.
+1. Cold recall. I state the idea from memory, in plain words. Mushy \u2014 make me sharpen it before moving on. Blank \u2014 one small hint (where it came from, or the principle under it), never the answer.
+2. Scenarios, one at a time: concrete, realistic, each from a different corner of life \u2014 a decision at work, a purchase, an argument, a habit, a news story. I apply the idea; you give blunt feedback \u2014 what I saw, what I missed. Include one trap where the idea does NOT apply or a different model matters more; if I swing it like a hammer at everything, catch me.
+3. Finish: where in my actual life, this week, should this model fire? Make me name something specific and real.
 
 Rules:
 - Calm, plain tone. No exclamation marks, no cuteness. One question at a time. Short replies. Never lecture.
+- No cushioning \u2014 if I'm wrong, say so and say why.
+- If I'm stuck and say so ("idk", "help", "I don't know"): explain that one piece the way Richard Feynman would \u2014 plain words, a concrete everyday analogy, built from something I already know. Then hand it back: I say it in my own words, and we re-run what I failed.
 - Everything stays on this one idea. If I drift, pull me back.
-- If I'm stuck and say so ("idk", "help", "I don't know"): explain that one piece the way Richard Feynman would — plain words, a concrete everyday analogy, built from something I already know. Then immediately hand it back: make me say it in my own words, then re-run the scenario I failed. Don't move on until I can.
-- No cushioning — if I'm wrong, say so and say why.
-- At the very end, tell me plainly which to tap in my app: Nailed it, or Struggled. Be honest, not kind.`;
+
+Run it efficiently \u2014 minutes, not an hour:
+- Every question must earn its place. The moment an answer proves a point, move on. Never re-test what I've already shown.
+- Three scenarios is the default. If I'm clearly sharp, don't add more \u2014 go to the finish.
+- No recaps, no filler, no praise padding.`;
 }
 
 /* ---------- teaching prompt ---------- */
@@ -261,39 +260,26 @@ function teachPrompt(a){
   const t=a.aha.length>60?a.aha.slice(0,57)+"\u2026":a.aha;
   return `Distill \u2014 ${t}
 
-I'm going to explain one idea to you until it is truly simple. The idea:
+I'm going to explain one idea to you until it is truly simple:
 
-"${a.aha}"
-
-Context: it comes from "${a.book}". Use that only to follow what I mean — the conversation is about the idea itself, never about the book.
+"${a.aha}" (from "${a.book}")
 
 You are the listener. Rules:
 
-- Calm, plain tone. No exclamation marks, no acting like a child, no cuteness. Just direct.
-- Hold me to a child's standard of clarity: any term I haven't explained, ask what it means. Anything vague, name the exact part you don't get.
-- One short question at a time, always about what I just said.
-- Never explain the idea to me and never add your own knowledge. Work only from my words. You're the student.
-- Stay on this one idea. If I drift, pull me back.
-- Exception — if I'm stuck and say so ("idk", "help", "I don't know"): step out of the student role and explain that one piece the way Richard Feynman would — plain words, a concrete everyday example or analogy, build it from something I already know, no jargon. Then immediately hand it back: ask me to say it in my own words, and don't move on until I can. Then return to being the student.
-- Deliberate practice: aim your questions at my weakest spot, one notch past comfortable. If I stumbled on something, circle back to that exact spot later from a new angle. Before we finish, make me apply the idea to a fresh example I haven't used yet. Give immediate, honest feedback — say plainly what was off, no cushioning.
-- Before we finish, make the idea hang on something. Two questions, one at a time: (1) What bigger principle is this a branch of? Trunk before leaves — if I can't name the trunk, dig until I can. (2) What that I already know does it connect to — ideally a big model from a different field (compounding, evolution, feedback loops, incentives, redundancy)? Keep asking why until the connection is real, not decorative. An idea that connects to nothing will be forgotten. When we've found it, name the trunk in two or three plain words on its own line — "Trunk: compounding" — so I can file the insight under it in my app.
-- When my explanation is finally simple and complete, prove it: say the idea back in plain words. Then tell me plainly which to tap in my app: Nailed it, or Struggled. Be honest, not kind.
+- Calm, plain tone. No exclamation marks, no acting like a child, no cuteness. One short question at a time.
+- Hold me to a child's standard of clarity: any term I haven't explained, ask what it means; anything vague, name the exact part you don't get; a missing why is a hole \u2014 point at it.
+- Never explain the idea to me and never add your own knowledge. Work only from my words. You're the student, I'm the teacher.
+- Everything stays on this one idea. If I drift, pull me back.
+- If I'm stuck and say so ("idk", "help", "I don't know"): explain that one piece the way Richard Feynman would \u2014 plain words, a concrete everyday analogy, built from something I already know. Then hand it back immediately: I say it in my own words before we continue.
+- Aim at my weakest spot, one notch past comfortable. If I stumbled somewhere, circle back to that exact spot later from a new angle.
+- Once it's simple, make it hang on something: (1) What bigger principle is this a branch of? (2) What that I already know does it connect to \u2014 ideally a big model from a different field (compounding, evolution, feedback loops, incentives, redundancy)? Real connections, not decorative ones.
 
-Start by asking me to explain the idea.`;
+Run it efficiently \u2014 minutes, not an hour:
+- Every question must earn its place. The moment my answer proves I've got that part, move on. Never re-test what's already shown.
+- Depth only where I'm actually weak. If I'm clear early, skip ahead.
+- No recaps, no filler, no praise padding.
+- When my explanation is simple, complete, and connected, stop: prove it by saying the idea back in plain words. Then we're done.`;
 }
-
-/* ---------- spaced repetition ---------- */
-const DAY=86400000, INT=[1,3,7,14,30,60,120]; /* days between drills */
-const isDue=a=>!!(a.nextDue&&a.nextDue<=now());
-function passOne(a){
-  const st=(a.stage==null?-1:a.stage)+1;
-  a.stage=Math.min(st,INT.length-1);
-  a.nextDue=new Date(Date.now()+INT[a.stage]*DAY).toISOString();
-  a.lastTaught=now();a.updated_at=now();}
-function failOne(a){
-  a.stage=0;
-  a.nextDue=new Date(Date.now()+1*DAY).toISOString();
-  a.lastTaught=now();a.updated_at=now();}
 
 /* ---------- state ---------- */
 const CP={url:"",at:""};
@@ -340,7 +326,7 @@ async function fbPush(a){
   if(!FB.on||!FB.db)return;
   try{await FB.fns.setDoc(docRef(a.id),{aha:a.aha,book:a.book||"",trunk:a.trunk||"",updated_at:a.updated_at,
     created:a.created||a.updated_at,deleted:!!a.deleted,
-    stage:a.stage==null?null:a.stage,nextDue:a.nextDue||"",lastTaught:a.lastTaught||""})}
+    lastTaught:a.lastTaught||""})}
   catch(e){console.warn(e);setSync("Offline — saved here, will sync when back")}}
 
 async function fbPushSettings(){
@@ -356,11 +342,11 @@ function adopt(id,d){
   const l=ahas.find(x=>x.id===id);
   if(!l){ahas.push({id,aha:d.aha,book:d.book||"",trunk:d.trunk||"",updated_at:d.updated_at,
     created:d.created||d.updated_at,deleted:!!d.deleted,
-    stage:d.stage==null?null:d.stage,nextDue:d.nextDue||"",lastTaught:d.lastTaught||""});return true}
+    lastTaught:d.lastTaught||""});return true}
   if(String(d.updated_at||"")>String(l.updated_at||"")){
     Object.assign(l,{aha:d.aha,book:d.book||"",trunk:d.trunk||"",updated_at:d.updated_at,
       deleted:!!d.deleted,created:l.created||d.created,
-      stage:d.stage==null?null:d.stage,nextDue:d.nextDue||"",lastTaught:d.lastTaught||""});return true}
+      lastTaught:d.lastTaught||""});return true}
   return false}
 
 function fbListen(){
@@ -417,7 +403,6 @@ function feed(){
   const book=sel.value,q=$("q").value.trim().toLowerCase();
   const list=ahas.map((a,i)=>({a,i})).filter(({a})=>!a.deleted)
     .filter(({a})=>(!book||a.book===book)&&(!q||a.aha.toLowerCase().includes(q)||a.book.toLowerCase().includes(q)));
-  list.sort((p,qq)=>(isDue(p.a)?0:1)-(isDue(qq.a)?0:1));
   $("clearq").classList.toggle("hide",!q&&!book);
   $("count").textContent=(q||book)?`${list.length} of ${liveN}`:"";
   const hl=t=>{if(!q)return esc(t);const i=t.toLowerCase().indexOf(q);if(i<0)return esc(t);
@@ -445,7 +430,7 @@ function feed(){
     return}
   $("feed").innerHTML=(list.length?list.map(({a,i})=>`
     <div class="card click fade" onclick="open_(${i})">
-      <div class="labrow">${book?"":`<div class="lab">${hl(a.book)}</div>`}${isDue(a)?`<span class="date due">DUE</span>`:`<span class="date">${fmtDate(a.created||a.updated_at)}</span>`}</div>
+      <div class="labrow">${book?"":`<div class="lab">${hl(a.book)}</div>`}<span class="date">${fmtDate(a.created||a.updated_at)}</span></div>
       <p class="aha">${hl(a.aha)}</p>
     </div>`).join("")
     :`<div class="card"><p class="aha">Nothing here yet.</p></div>`)}
@@ -460,9 +445,8 @@ function open_(i){cur=i;const a=ahas[i];
 $("teach").addEventListener("click",()=>{
   const a=ahas[cur];
   try{navigator.clipboard.writeText(a.lastTaught?drillPrompt(a):teachPrompt(a))}catch(err){}
+  if(!a.lastTaught){a.lastTaught=now();a.updated_at=now();save();fbPush(a)}
 });
-$("passBtn").onclick=()=>{const a=ahas[cur];passOne(a);save();fbPush(a);go("feed")};
-$("failBtn").onclick=()=>{const a=ahas[cur];failOne(a);save();fbPush(a);go("feed")};
 
 /* ---------- edit ---------- */
 function newOne(){editing=null;$("aha").value="";$("book").value="";$("trunk").value="";$("hEdit").textContent="";
@@ -481,7 +465,7 @@ $("saveOne").onclick=()=>{
   editing==null?go("feed"):open_(editing)};
 $("del").onclick=()=>{
   if(editing==null)return;
-  if(!confirm("Delete this insight?"))return;
+  if(!confirm("Delete this aphorism?"))return;
   const a=ahas[editing];a.deleted=true;a.updated_at=now();
   save();fbPush(a);go("feed")};
 
@@ -502,7 +486,7 @@ $("fboff").onclick=()=>{
   if(FB.unsub){try{FB.unsub()}catch(e){}}
   FB.unsub=null;FB.on=false;save();$("hC").textContent="Saved on this device only"};
 $("forget").onclick=()=>{
-  if(!confirm("Erase everything stored on this device? Insights already synced stay in Firebase."))return;
+  if(!confirm("Erase everything stored on this device? Aphorisms already synced stay in Firebase."))return;
   if(FB.unsub){try{FB.unsub()}catch(e){}}
   try{localStorage.removeItem(KEY)}catch(e){}
   ahas=[];FB.on=false;FB.unsub=null;save();go("feed")};
@@ -518,7 +502,7 @@ $("bookFilter").addEventListener("change",feed);
   if(d){
     if(Array.isArray(d.ahas))ahas=d.ahas.map(a=>({id:a.id,aha:a.aha,book:a.book,trunk:a.trunk||"",
       updated_at:a.updated_at,created:a.created,deleted:a.deleted,
-      stage:a.stage==null?null:a.stage,nextDue:a.nextDue||"",lastTaught:a.lastTaught||""}));
+      lastTaught:a.lastTaught||""}));
     if(d.view==="tree")view="tree";
     CP.url=d.cproj||"";CP.at=d.cprojAt||"";
     FB.apiKey=d.fbKey||"";FB.projectId=d.fbProj||"";FB.on=!!(d.fbOn&&FB.apiKey&&FB.projectId);
