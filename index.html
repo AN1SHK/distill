@@ -105,7 +105,10 @@
 <body>
 <div class="wrap">
 
-  <span class="brand" onclick="go('feed')">Distill</span>
+  <div style="position:relative">
+    <span class="brand" onclick="go('feed')">Distill</span>
+    <span id="streak" class="lab" style="position:absolute;right:0;top:2px;color:var(--faint)"></span>
+  </div>
 
   <!-- ---------- list ---------- -->
   <section id="feedwrap">
@@ -252,7 +255,9 @@ Rules:
 Run it efficiently \u2014 minutes, not an hour:
 - Every question must earn its place. The moment an answer proves a point, move on. Never re-test what I've already shown.
 - Three scenarios is the default. If I'm clearly sharp, don't add more \u2014 go to the finish.
-- No recaps, no filler, no praise padding.`;
+- No recaps, no filler, no praise padding.
+- When the drill is done and I held up, end with one final line, alone, exactly: DRILLED \u2713
+  Only if I earned it \u2014 if my recall stayed mushy or I failed the scenarios, never write it.`;
 }
 
 /* ---------- teaching prompt ---------- */
@@ -278,8 +283,23 @@ Run it efficiently \u2014 minutes, not an hour:
 - Every question must earn its place. The moment my answer proves I've got that part, move on. Never re-test what's already shown.
 - Depth only where I'm actually weak. If I'm clear early, skip ahead.
 - No recaps, no filler, no praise padding.
-- When my explanation is simple, complete, and connected, stop: prove it by saying the idea back in plain words. Then we're done.`;
+- When my explanation is simple, complete, and connected, stop: prove it by saying the idea back in plain words. Then end with one final line, alone, exactly: TAUGHT \u2713
+  Only write that line if I genuinely earned it. If we never got there, never write it \u2014 no consolation passes.`;
 }
+
+/* ---------- streak: one teach or drill per day keeps it alive ---------- */
+const ST={count:0,last:"",at:""};
+const dstr=d=>{const x=d||new Date();
+  return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
+function streakLive(){
+  const today=dstr(),yest=dstr(new Date(Date.now()-86400000));
+  return (ST.last===today||ST.last===yest)?ST.count:0}
+function streakTick(){
+  const today=dstr(),yest=dstr(new Date(Date.now()-86400000));
+  if(ST.last===today)return false;
+  ST.count=(ST.last===yest)?ST.count+1:1;
+  ST.last=today;ST.at=now();
+  return true}
 
 /* ---------- state ---------- */
 const CP={url:"",at:""};
@@ -289,7 +309,8 @@ const KEY="distill.v6";
 let canStore=true;
 try{localStorage.setItem(KEY+".t","1");localStorage.removeItem(KEY+".t")}catch(e){canStore=false}
 function save(){if(!canStore)return;
-  try{localStorage.setItem(KEY,JSON.stringify({ahas,view,cproj:CP.url,cprojAt:CP.at,
+  try{localStorage.setItem(KEY,JSON.stringify({ahas,view,stCount:ST.count,stLast:ST.last,stAt:ST.at,
+    cproj:CP.url,cprojAt:CP.at,
     fbKey:FB.apiKey,fbProj:FB.projectId,fbOn:FB.on}))}catch(e){canStore=false}}
 function load(){if(!canStore)return null;
   try{return JSON.parse(localStorage.getItem(KEY)||localStorage.getItem("distill.v5")||localStorage.getItem("distill.v3")||"null")}catch(e){return null}}
@@ -329,12 +350,21 @@ async function fbPush(a){
     lastTaught:a.lastTaught||""})}
   catch(e){console.warn(e);setSync("Offline — saved here, will sync when back")}}
 
+async function fbPushStreak(){
+  if(!FB.on||!FB.db)return;
+  try{await FB.fns.setDoc(docRef("_streak"),{count:ST.count,last:ST.last,updated_at:ST.at||now()})}
+  catch(e){console.warn(e)}}
+
 async function fbPushSettings(){
   if(!FB.on||!FB.db)return;
   try{await FB.fns.setDoc(docRef("_settings"),{projectUrl:CP.url||"",updated_at:CP.at||now()})}
   catch(e){console.warn(e)}}
 
 function adopt(id,d){
+  if(id==="_streak"){
+    if(String(d.updated_at||"")>String(ST.at||"")){
+      ST.count=d.count||0;ST.last=d.last||"";ST.at=d.updated_at||now();return true}
+    return false}
   if(id==="_settings"){
     if(d.projectUrl!==undefined&&String(d.updated_at||"")>String(CP.at||"")){
       CP.url=d.projectUrl||"";CP.at=d.updated_at||now();$("cproj").value=CP.url;return true}
@@ -358,10 +388,12 @@ function fbListen(){
     if(first){
       first=false;
       const remote=new Map(snap.docs.map(dd=>[dd.id,dd.data()]));
-      ahas.forEach(a=>{const r=remote.get(a.id);
+      ahas.forEach(a=>{if(String(a.id).startsWith("_"))return;const r=remote.get(a.id);
         if(!r||String(a.updated_at)>String(r.updated_at||""))fbPush(a)});
       const rs=remote.get("_settings");
       if(CP.url&&(!rs||String(CP.at)>String(rs.updated_at||"")))fbPushSettings();
+      const rk=remote.get("_streak");
+      if(ST.count&&(!rk||String(ST.at)>String(rk.updated_at||"")))fbPushStreak();
     }
     if(changed){
       ahas.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
@@ -393,7 +425,11 @@ function clearQ(){$("q").value="";$("bookFilter").value="";feed()}
 function bookList(){const m=new Map();ahas.forEach(a=>{if(!a.deleted)m.set(a.book,(m.get(a.book)||0)+1)});
   return [...m.entries()].sort((x,y)=>x[0].localeCompare(y[0]))}
 
+function drawStreak(){const n=streakLive();
+  $("streak").textContent=n>0?("Streak "+n):""}
+
 function feed(){
+  drawStreak();
   const sel=$("bookFilter"),keep=sel.value;
   const liveN=ahas.filter(a=>!a.deleted).length;
   sel.innerHTML=`<option value="">All books · ${liveN}</option>`+
@@ -445,7 +481,11 @@ function open_(i){cur=i;const a=ahas[i];
 $("teach").addEventListener("click",()=>{
   const a=ahas[cur];
   try{navigator.clipboard.writeText(a.lastTaught?drillPrompt(a):teachPrompt(a))}catch(err){}
-  if(!a.lastTaught){a.lastTaught=now();a.updated_at=now();save();fbPush(a)}
+  let dirty=false;
+  if(!a.lastTaught){a.lastTaught=now();a.updated_at=now();dirty=true;fbPush(a)}
+  if(streakTick()){fbPushStreak();dirty=true}
+  if(dirty)save();
+  drawStreak();
 });
 
 /* ---------- edit ---------- */
@@ -489,7 +529,7 @@ $("forget").onclick=()=>{
   if(!confirm("Erase everything stored on this device? Aphorisms already synced stay in Firebase."))return;
   if(FB.unsub){try{FB.unsub()}catch(e){}}
   try{localStorage.removeItem(KEY)}catch(e){}
-  ahas=[];FB.on=false;FB.unsub=null;save();go("feed")};
+  ahas=[];FB.on=false;FB.unsub=null;ST.count=0;ST.last="";ST.at="";save();go("feed")};
 
 $("viewBtn").onclick=()=>{view=view==="list"?"tree":"list";save();feed()};
 $("q").addEventListener("input",feed);
@@ -504,6 +544,7 @@ $("bookFilter").addEventListener("change",feed);
       updated_at:a.updated_at,created:a.created,deleted:a.deleted,
       lastTaught:a.lastTaught||""}));
     if(d.view==="tree")view="tree";
+    ST.count=d.stCount||0;ST.last=d.stLast||"";ST.at=d.stAt||"";
     CP.url=d.cproj||"";CP.at=d.cprojAt||"";
     FB.apiKey=d.fbKey||"";FB.projectId=d.fbProj||"";FB.on=!!(d.fbOn&&FB.apiKey&&FB.projectId);
     $("cproj").value=CP.url;
